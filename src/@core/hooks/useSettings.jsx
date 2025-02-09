@@ -1,15 +1,18 @@
-// React Imports
+'use client'
+
 import { useContext } from 'react'
-import { SettingsProvider } from '@core/contexts/settingsContext'
-// Context Imports
-import { SettingsContext } from '@core/contexts/settingsContext'
+import { SettingsContext, defaultSettings } from '@core/contexts/settingsContext'
 
 export const useSettings = () => {
-  // Hooks
   const context = useContext(SettingsContext)
-
+  
   if (!context) {
-    throw new Error('useSettingsContext must be used within a SettingsProvider')
+    console.warn('useSettings: context not found, using default settings')
+    return {
+      settings: defaultSettings,
+      updateSettings: () => null,
+      resetSettings: () => null
+    }
   }
 
   return context

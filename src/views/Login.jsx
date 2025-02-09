@@ -201,7 +201,27 @@ const Login = ({ mode }) => {
         localStorage.removeItem('pendingSession')
         sessionStorage.removeItem('pendingSession')
   
-        router.replace(getLocalizedUrl(searchParams.get('redirectTo') ?? '/', locale))
+        localStorage.setItem('sessionId', response.data.SessionID);
+        localStorage.setItem('settings', JSON.stringify(response.data.userSettings));
+        const defaultSettings = {
+          skin: 'default',
+          appBar: 'fixed',
+          navCollapsed: false,
+          layout: 'vertical',
+          lastLayout: 'vertical',
+          direction: 'ltr',
+          semiDark: false,
+          navbarType: 'floating',
+          footerType: 'static',
+          themeColor: 'primary',
+          contentWidth: 'full'
+        }
+        localStorage.setItem('settings', JSON.stringify(defaultSettings))
+        window.dispatchEvent(new Event('storage'))
+        window.dispatchEvent(new CustomEvent('auth-change', {
+          detail: { loggedIn: true }
+        }));
+        router.push(getLocalizedUrl('/dashboards/crm', locale))
       } else {
         setErrorState({ message: 'Invalid OTP code' })
       }

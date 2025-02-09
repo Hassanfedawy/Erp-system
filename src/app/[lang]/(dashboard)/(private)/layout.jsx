@@ -1,3 +1,6 @@
+// Server component
+import ClientLayout from './ClientLayout'
+
 // MUI Imports
 import Button from '@mui/material/Button'
 
@@ -16,27 +19,40 @@ import HorizontalFooter from '@components/layout/horizontal/Footer'
 import Customizer from '@core/components/customizer'
 import ScrollToTop from '@core/components/scroll-to-top'
 
-// Config Imports
-import { i18n } from '@configs/i18n'
-
 // Util Imports
 import { getDictionary } from '@/utils/getDictionary'
 import { getMode, getSystemMode } from '@core/utils/serverHelpers'
+import { i18n } from '@configs/i18n'
+
+const defaultSettings = {
+  skin: 'default',
+  appBar: 'fixed',
+  navCollapsed: false,
+  layout: 'vertical',
+  lastLayout: 'vertical',
+  direction: 'ltr',
+  semiDark: false,
+  navbarType: 'floating',
+  footerType: 'static',
+  themeColor: 'primary',
+  contentWidth: 'full'
+}
 
 const Layout = async ({ children, params }) => {
-  // Vars
-  const direction = i18n.langDirection[params.lang]
   const dictionary = await getDictionary(params.lang)
+  const direction = i18n.langDirection[params.lang]
   const mode = getMode()
   const systemMode = getSystemMode()
 
   return (
-    <Providers direction={direction}>
-      <LayoutWrapper
-        systemMode={systemMode}
-        verticalLayout={
-          <VerticalLayout
-            navigation={<Navigation dictionary={dictionary} mode={mode} systemMode={systemMode} />}
+    <ClientLayout direction={direction} systemMode={systemMode}>
+      <Providers direction={direction}>
+        <LayoutWrapper
+          systemMode={systemMode}
+          settings={defaultSettings}
+          verticalLayout={
+            <VerticalLayout
+              navigation={<Navigation dictionary={dictionary} mode={mode} systemMode={systemMode} />}
               navbar={<Navbar />}
               footer={<VerticalFooter />}
             >
@@ -50,15 +66,13 @@ const Layout = async ({ children, params }) => {
           }
         />
         <ScrollToTop className='mui-fixed'>
-          <Button
-            variant='contained'
-            className='is-10 bs-10 rounded-full p-0 min-is-0 flex items-center justify-center'
-          >
+          <Button variant='contained'>
             <i className='tabler-arrow-up' />
           </Button>
         </ScrollToTop>
-        <Customizer dir={direction} />
-    </Providers>
+        <Customizer />
+      </Providers>
+    </ClientLayout>
   )
 }
 

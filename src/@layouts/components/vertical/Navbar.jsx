@@ -33,13 +33,13 @@ const Navbar = props => {
   })
 
   // Vars
-  const { navbarContentWidth } = settings
-  const headerFixed = themeConfig.navbar.type === 'fixed'
-  const headerStatic = themeConfig.navbar.type === 'static'
-  const headerFloating = themeConfig.navbar.floating === true
-  const headerDetached = themeConfig.navbar.detached === true
-  const headerAttached = themeConfig.navbar.detached === false
-  const headerBlur = themeConfig.navbar.blur === true
+  const { navbarContentWidth = 'fixed', navbar = { type: 'static', floating: false, detached: false, blur: false } } = settings || {}
+  const headerFixed = navbar.type === 'fixed'
+  const headerStatic = navbar.type === 'static'
+  const headerFloating = navbar.floating === true
+  const headerDetached = navbar.detached === true
+  const headerAttached = navbar.detached === false
+  const headerBlur = navbar.blur === true
   const headerContentCompact = navbarContentWidth === 'compact'
   const headerContentWide = navbarContentWidth === 'wide'
 

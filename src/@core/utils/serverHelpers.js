@@ -1,3 +1,5 @@
+'use server'
+
 // Next Imports
 import { cookies } from 'next/headers'
 

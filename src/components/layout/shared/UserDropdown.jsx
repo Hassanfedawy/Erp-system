@@ -20,8 +20,6 @@ import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 
-// Third-party Imports
-
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
 
@@ -37,6 +35,13 @@ const BadgeContentSpan = styled('span')({
   backgroundColor: 'var(--mui-palette-success-main)',
   boxShadow: '0 0 0 2px var(--mui-palette-background-paper)'
 })
+
+// Placeholder user data - replace with your actual user data source
+const userData = {
+  name: 'John Doe',
+  email: 'john@example.com',
+  image: '/images/avatars/1.png'
+}
 
 const UserDropdown = () => {
   // States
@@ -68,12 +73,11 @@ const UserDropdown = () => {
 
   const handleUserLogout = async () => {
     try {
-      // Sign out from the app
+      // Implement your logout logic here
+      router.push('/login')
     } catch (error) {
       console.error(error)
-
-      // Show above error in a toast like following
-      // toastService.error((err as Error).message)
+      // Show error in a toast
     }
   }
 
@@ -88,8 +92,8 @@ const UserDropdown = () => {
       >
         <Avatar
           ref={anchorRef}
-          alt={session?.user?.name || ''}
-          src={session?.user?.image || ''}
+          alt={userData.name}
+          src={userData.image}
           onClick={handleDropdownOpen}
           className='cursor-pointer bs-[38px] is-[38px]'
         />
@@ -113,12 +117,12 @@ const UserDropdown = () => {
               <ClickAwayListener onClickAway={e => handleDropdownClose(e)}>
                 <MenuList>
                   <div className='flex items-center plb-2 pli-6 gap-2' tabIndex={-1}>
-                    <Avatar alt={session?.user?.name || ''} src={session?.user?.image || ''} />
+                    <Avatar alt={userData.name} src={userData.image} />
                     <div className='flex items-start flex-col'>
                       <Typography className='font-medium' color='text.primary'>
-                        {session?.user?.name || ''}
+                        {userData.name}
                       </Typography>
-                      <Typography variant='caption'>{session?.user?.email || ''}</Typography>
+                      <Typography variant='caption'>{userData.email}</Typography>
                     </div>
                   </div>
                   <Divider className='mlb-1' />

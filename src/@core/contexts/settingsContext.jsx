@@ -1,99 +1,57 @@
 'use client'
-import { createContext, useMemo, useState } from 'react'
 
-// Config Imports
+import { createContext, useState, useCallback } from 'react'
 import themeConfig from '@configs/themeConfig'
-import primaryColorConfig from '@configs/primaryColorConfig'
 
-// Hook Imports
-import { useObjectCookie } from '@core/hooks/useObjectCookie'
+export const defaultSettings = {
+  mode: 'light',
+  skin: 'default',
+  semiDark: false,
+  layout: 'vertical',
+  navbarContentWidth: 'compact',
+  contentWidth: 'wide',
+  footerContentWidth: 'compact',
+  primaryColor: '#7367F0'
+}
 
-// Initial Settings Context
-export const SettingsContext = createContext(null)
+export const SettingsContext = createContext({
+  settings: defaultSettings,
+  updateSettings: () => null,
+  resetSettings: () => null
+})
 
-// Settings Provider
-export const SettingsProvider = props => {
-  // Initial Settings
-  const initialSettings = {
-    mode: themeConfig.mode,
-    skin: themeConfig.skin,
-    semiDark: themeConfig.semiDark,
-    layout: themeConfig.layout,
-    navbarContentWidth: themeConfig.navbar.contentWidth,
-    contentWidth: themeConfig.contentWidth,
-    footerContentWidth: themeConfig.footer.contentWidth,
-    primaryColor: primaryColorConfig[0].main
-  }
-
-  const updatedInitialSettings = {
-    ...initialSettings,
-    mode: props.mode || themeConfig.mode
-  }
-
-  // Cookies
-  const [settingsCookie, updateSettingsCookie] = useObjectCookie(
-    themeConfig.settingsCookieName,
-    JSON.stringify(props.settingsCookie) !== '{}' ? props.settingsCookie : updatedInitialSettings
-  )
-
+export const SettingsProvider = ({ children }) => {
   // State
-  const [_settingsState, _updateSettingsState] = useState(
-    JSON.stringify(settingsCookie) !== '{}' ? settingsCookie : updatedInitialSettings
-  )
+  const [settings, setSettings] = useState(() => {
+    try {
+      const storedSettings = typeof window !== 'undefined' ? localStorage.getItem('settings') : null
+      return storedSettings ? JSON.parse(storedSettings) : defaultSettings
+    } catch (error) {
+      console.error('Error loading settings:', error)
+      return defaultSettings
+    }
+  })
 
-  const updateSettings = (settings, options) => {
-    const { updateCookie = true } = options || {}
-
-    _updateSettingsState(prev => {
-      const newSettings = { ...prev, ...settings }
-
-      // Update cookie if needed
-      if (updateCookie) updateSettingsCookie(newSettings)
-
+  const updateSettings = useCallback((updatedSettings) => {
+    setSettings(prevSettings => {
+      const newSettings = { ...prevSettings, ...updatedSettings }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('settings', JSON.stringify(newSettings))
+      }
       return newSettings
     })
-  }
+  }, [])
 
-  /**
-   * Updates the settings for page with the provided settings object.
-   * Updated settings won't be saved to cookie hence will be reverted once navigating away from the page.
-   *
-   * @param settings - The partial settings object containing the properties to update.
-   * @returns A function to reset the page settings.
-   *
-   * @example
-   * useEffect(() => {
-   *     return updatePageSettings({ theme: 'dark' });
-   * }, []);
-   */
-  const updatePageSettings = settings => {
-    updateSettings(settings, { updateCookie: false })
-
-    // Returns a function to reset the page settings
-    return () => updateSettings(settingsCookie, { updateCookie: false })
-  }
-
-  const resetSettings = () => {
-    updateSettings(initialSettings)
-  }
-
-  const isSettingsChanged = useMemo(
-    () => JSON.stringify(initialSettings) !== JSON.stringify(_settingsState),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [_settingsState]
-  )
+  const resetSettings = useCallback(() => {
+    setSettings(defaultSettings)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('settings', JSON.stringify(defaultSettings))
+    }
+  }, [])
 
   return (
-    <SettingsContext.Provider
-      value={{
-        settings: _settingsState,
-        updateSettings,
-        isSettingsChanged,
-        resetSettings,
-        updatePageSettings
-      }}
-    >
-      {props.children}
+    <SettingsContext.Provider value={{ settings, updateSettings, resetSettings }}>
+      {children}
     </SettingsContext.Provider>
   )
 }

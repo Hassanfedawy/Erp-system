@@ -1,21 +1,18 @@
 'use client'
 
 // Hook Imports
-import { useSettings } from '@core/hooks/useSettings'
-import useLayoutInit from '@core/hooks/useLayoutInit'
 import { SettingsProvider } from '@core/contexts/settingsContext'
+import useLayoutInit from '@core/hooks/useLayoutInit'
 
 const LayoutWrapper = props => {
   // Props
-  const { systemMode, verticalLayout, horizontalLayout } = props
+  const { systemMode, verticalLayout, horizontalLayout, settings } = props
 
   // Hooks
-  const { settings } = useSettings()
   useLayoutInit(systemMode)
 
-  // Return the layout based on the layout context
   return (
-    <SettingsProvider>
+    <SettingsProvider settings={settings}>
       <div className='flex flex-col flex-auto' data-skin={settings.skin}>
         {settings.layout === 'horizontal' ? horizontalLayout : verticalLayout}
       </div>

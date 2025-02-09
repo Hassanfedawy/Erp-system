@@ -1,8 +1,6 @@
 'use client'
-
 // React Imports
-import { useState } from 'react'
-
+import { useState, useEffect } from 'react'
 // MUI Imports
 import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
@@ -11,24 +9,85 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
-
 // Component Imports
 import CustomTextField from '@core/components/mui/TextField'
-
 // Vars
+import crypto from 'crypto'
+// Environment Variables
+const key = process.env.NEXT_PUBLIC_AES_KEY
+const iv = process.env.NEXT_PUBLIC_AES_IV
+const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN
+const ACCESS_TOKEN = process.env.NEXT_PUBLIC_ACCESS_TOKEN
+
+// Encryption Helpers
+const resizeKey = (str, length) => {
+  if (str.length > length) {
+    return str.slice(0, length)
+  } else if (str.length < length) {
+    return str.padEnd(length, '\0')
+  }
+  return str
+}
+
+const encrypt = (text, keyVal, ivVal) => {
+  const resizedKey = resizeKey(keyVal, 32)
+  const resizedIV = resizeKey(ivVal, 16)
+  const cipher = crypto.createCipheriv(
+    'aes-256-cbc',
+    Buffer.from(resizedKey, 'utf8'),
+    Buffer.from(resizedIV, 'utf8')
+  )
+  let encrypted = cipher.update(text, 'utf8', 'base64')
+  encrypted += cipher.final('base64')
+  return encrypted
+}
+
+const decrypt = (encryptedText, keyVal, ivVal) => {
+  if (!encryptedText) {
+    console.error('Decryption error: No encrypted text provided')
+    return ''
+  }
+  const resizedKey = resizeKey(keyVal, 32)
+  const resizedIV = resizeKey(ivVal, 16)
+  try {
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(resizedKey, 'utf8'),
+      Buffer.from(resizedIV, 'utf8')
+    )
+    let decrypted = decipher.update(encryptedText, 'base64', 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  } catch (error) {
+    console.error('Decryption error:', error)
+    return ''
+  }
+}
+
+const encryptData = (data, key, iv) => {
+  const jsonString = JSON.stringify(data)
+  return encrypt(jsonString, key, iv)
+}
+
 const initialData = {
-  firstName: 'John',
-  lastName: 'Doe',
-  email: 'john.doe@example.com',
-  organization: 'Pixinvent',
-  phoneNumber: '+1 (917) 543-9876',
-  address: '123 Main St, New York, NY 10001',
-  state: 'New York',
-  zipCode: '634880',
-  country: 'usa',
-  language: 'english',
-  timezone: 'gmt-12',
-  currency: 'usd'
+  id: '', // Add this field to store the account ID
+  serialNumber: '',
+  name: '',
+  telephone: '',
+  accountClass: '',
+  maxDebit: '',
+  notes: '',
+  isCustomer: '',
+  isSupplier: '',
+  address: '',
+  active: '',
+  show: '',
+  email: '',
+  phone: '',
+  company: '',
+  accountTypeId: '',
+  whatsapp: '',
+  whatsappGroupId: ''
 }
 
 const languageData = ['English', 'Arabic', 'French', 'German', 'Portuguese']
@@ -38,7 +97,86 @@ const AccountDetails = () => {
   const [formData, setFormData] = useState(initialData)
   const [fileInput, setFileInput] = useState('')
   const [imgSrc, setImgSrc] = useState('/images/avatars/1.png')
-  const [language, setLanguage] = useState(['English'])
+  const [language, setLanguage] = useState(['English']) // Ensure initial value is an array
+  const [sessionId, setSessionId] = useState('')
+
+  useEffect(() => {
+    // Fetch session ID from local storage
+    const storedSessionId = localStorage.getItem('sessionId')
+    if (storedSessionId) {
+      setSessionId(storedSessionId)
+    }
+    fetchAccountDetails()
+  }, [])
+
+  const fetchAccountDetails = async () => {
+    try {
+      const body = {
+        Index: '9Gxa/++yB2r7leSJMWyxnA==',
+        Params: '' // Adjust as needed
+      }
+      const encryptedBody = encryptData(body, key, iv)
+
+      const response = await fetch(`https://erpapi.tocan.com.ly/api/Home/DataTrans`, {
+        method: 'POST',
+        headers: {
+          Token: API_TOKEN,
+          'Content-Type': 'application/json',
+          accessToken: ACCESS_TOKEN,
+          sessionId: sessionId
+        },
+        body: JSON.stringify({ body: encryptedBody })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      console.log('Response Data:', responseData) // Log response data for debugging
+
+      if (!responseData.body) {
+        console.error('Response does not contain encrypted body')
+        return
+      }
+
+      const decryptedData = decrypt(responseData.body, key, iv)
+      if (!decryptedData) {
+        console.error('Decryption failed or no data received')
+        return
+      }
+      const parsedData = JSON.parse(decryptedData)
+
+      // Assuming the response contains the account details
+      setFormData({
+        id: parsedData.id || '',
+        serialNumber: parsedData.serialNumber || '',
+        name: parsedData.name || '',
+        telephone: parsedData.telephone || '',
+        accountClass: parsedData.accountClass || '',
+        maxDebit: parsedData.maxDebit || '',
+        notes: parsedData.notes || '',
+        isCustomer: parsedData.isCustomer || '',
+        isSupplier: parsedData.isSupplier || '',
+        address: parsedData.address || '',
+        active: parsedData.active || '',
+        show: parsedData.show || '',
+        email: parsedData.email || '',
+        phone: parsedData.phone || '',
+        company: parsedData.company || '',
+        accountTypeId: parsedData.accountTypeId || '',
+        whatsapp: parsedData.whatsapp || '',
+        whatsappGroupId: parsedData.whatsappGroupId || ''
+      })
+
+      // Update language based on parsed data
+      if (parsedData.language) {
+        setLanguage(parsedData.language.split(',').map(lang => lang.trim()))
+      }
+    } catch (error) {
+      console.error('Error fetching account details:', error)
+    }
+  }
 
   const handleDelete = value => {
     setLanguage(current => current.filter(item => item !== value))
@@ -55,11 +193,9 @@ const AccountDetails = () => {
   const handleFileInputChange = file => {
     const reader = new FileReader()
     const { files } = file.target
-
     if (files && files.length !== 0) {
       reader.onload = () => setImgSrc(reader.result)
       reader.readAsDataURL(files[0])
-
       if (reader.result !== null) {
         setFileInput(reader.result)
       }
@@ -71,148 +207,150 @@ const AccountDetails = () => {
     setImgSrc('/images/avatars/1.png')
   }
 
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    // Prepare the data for the API request
+    const body = {
+      state: 1, // Assuming 1 for update
+      Index: '9Gxa/++yB2r7leSJMWyxnA==',
+      Params: `${formData.id}#~${formData.serialNumber}#~${formData.name}#~${formData.telephone}#~${formData.accountClass}#~${formData.maxDebit}#~${formData.notes}#~${formData.isCustomer}#~${formData.isSupplier}#~${formData.address}#~${formData.active}#~${formData.show}#~${formData.email}#~${formData.phone}#~${formData.company}#~${formData.accountTypeId}#~${formData.whatsapp}#~${formData.whatsappGroupId}#~${language.join(',')}`
+    }
+
+    const encryptedBody = encryptData(body, key, iv)
+
+    try {
+      const response = await fetch(`https://erpapi.tocan.com.ly/api/Home/DataTrans`, {
+        method: 'POST',
+        headers: {
+          Token: API_TOKEN,
+          'Content-Type': 'application/json',
+          accessToken: ACCESS_TOKEN,
+          sessionId: sessionId
+        },
+        body: JSON.stringify({ body: encryptedBody })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      console.log('Response Data:', responseData) // Log response data for debugging
+
+      if (!responseData.body) {
+        console.error('Response does not contain encrypted body')
+        return
+      }
+
+      const decryptedData = decrypt(responseData.body, key, iv)
+      if (!decryptedData) {
+        console.error('Decryption failed or no data received')
+        return
+      }
+      const parsedData = JSON.parse(decryptedData)
+
+      // Handle the response as needed
+      console.log('Account updated successfully:', parsedData)
+    } catch (error) {
+      console.error('Error updating account:', error)
+    }
+  }
+
+  const handleReset = () => {
+    setFormData(initialData)
+    setLanguage(['English']) // Reset language to initial value
+  }
+
   return (
     <Card>
-      <CardContent className='mbe-4'>
-        <div className='flex max-sm:flex-col items-center gap-6'>
-          <img height={100} width={100} className='rounded' src={imgSrc} alt='Profile' />
-          <div className='flex flex-grow flex-col gap-4'>
-            <div className='flex flex-col sm:flex-row gap-4'>
-              <Button component='label' variant='contained' htmlFor='account-settings-upload-image'>
-                Upload New Photo
-                <input
-                  hidden
-                  type='file'
-                  value={fileInput}
-                  accept='image/png, image/jpeg'
-                  onChange={handleFileInputChange}
-                  id='account-settings-upload-image'
-                />
-              </Button>
-              <Button variant='tonal' color='secondary' onClick={handleFileInputReset}>
-                Reset
-              </Button>
-            </div>
-            <Typography>Allowed JPG, GIF or PNG. Max size of 800K</Typography>
-          </div>
-        </div>
-      </CardContent>
       <CardContent>
-        <form onSubmit={e => e.preventDefault()}>
-          <Grid container spacing={6}>
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='First Name'
-                value={formData.firstName}
-                placeholder='John'
-                onChange={e => handleFormChange('firstName', e.target.value)}
+                label="First Name"
+                value={formData.name.split(' ')[0]}
+                onChange={(e) => handleFormChange('name', `${e.target.value} ${formData.name.split(' ')[1]}`)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='Last Name'
-                value={formData.lastName}
-                placeholder='Doe'
-                onChange={e => handleFormChange('lastName', e.target.value)}
+                label="Last Name"
+                value={formData.name.split(' ')[1]}
+                onChange={(e) => handleFormChange('name', `${formData.name.split(' ')[0]} ${e.target.value}`)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='Email'
+                label="Email"
                 value={formData.email}
-                placeholder='john.doe@gmail.com'
-                onChange={e => handleFormChange('email', e.target.value)}
+                onChange={(e) => handleFormChange('email', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='Organization'
-                value={formData.organization}
-                placeholder='Pixinvent'
-                onChange={e => handleFormChange('organization', e.target.value)}
+                label="Organization"
+                value={formData.company}
+                onChange={(e) => handleFormChange('company', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='Phone Number'
-                value={formData.phoneNumber}
-                placeholder='+1 (234) 567-8901'
-                onChange={e => handleFormChange('phoneNumber', e.target.value)}
+                label="Phone Number"
+                value={formData.telephone}
+                onChange={(e) => handleFormChange('telephone', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='Address'
+                label="Address"
                 value={formData.address}
-                placeholder='Address'
-                onChange={e => handleFormChange('address', e.target.value)}
+                onChange={(e) => handleFormChange('address', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                label='State'
+                label="State"
                 value={formData.state}
-                placeholder='New York'
-                onChange={e => handleFormChange('state', e.target.value)}
+                onChange={(e) => handleFormChange('state', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
-                fullWidth
-                type='number'
-                label='Zip Code'
+                label="Zip Code"
                 value={formData.zipCode}
-                placeholder='123456'
-                onChange={e => handleFormChange('zipCode', e.target.value)}
+                onChange={(e) => handleFormChange('zipCode', e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <CustomTextField
+                label="Country"
+                value={formData.country}
+                onChange={(e) => handleFormChange('country', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
                 select
-                fullWidth
-                label='Country'
-                value={formData.country}
-                onChange={e => handleFormChange('country', e.target.value)}
-              >
-                <MenuItem value='usa'>USA</MenuItem>
-                <MenuItem value='uk'>UK</MenuItem>
-                <MenuItem value='australia'>Australia</MenuItem>
-                <MenuItem value='germany'>Germany</MenuItem>
-              </CustomTextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <CustomTextField
-                select
-                fullWidth
-                label='Language'
+                label="Language"
                 value={language}
-                SelectProps={{
-                  multiple: true, // @ts-ignore
-                  onChange: handleChange,
-                  renderValue: selected => (
-                    <div className='flex flex-wrap gap-2'>
-                      {selected.map(value => (
-                        <Chip
-                          key={value}
-                          clickable
-                          onMouseDown={event => event.stopPropagation()}
-                          size='small'
-                          label={value}
-                          onDelete={() => handleDelete(value)}
-                        />
-                      ))}
-                    </div>
-                  )
-                }}
+                onChange={handleChange}
+                multiple
+                renderValue={(selected) => (
+                  <div>
+                    {selected.map((value) => (
+                      <Chip
+                        key={value}
+                        size="small"
+                        label={value}
+                        onDelete={() => handleDelete(value)}
+                      />
+                    ))}
+                  </div>
+                )}
               >
-                {languageData.map(name => (
+                {languageData.map((name) => (
                   <MenuItem key={name} value={name}>
                     {name}
                   </MenuItem>
@@ -222,50 +360,50 @@ const AccountDetails = () => {
             <Grid item xs={12} sm={6}>
               <CustomTextField
                 select
-                fullWidth
-                label='TimeZone'
+                label="Timezone"
                 value={formData.timezone}
-                onChange={e => handleFormChange('timezone', e.target.value)}
-                SelectProps={{ MenuProps: { PaperProps: { style: { maxHeight: 250 } } } }}
+                onChange={(e) => handleFormChange('timezone', e.target.value)}
+                SelectProps={{
+                  MenuProps: { PaperProps: { style: { maxHeight: 250 } } }
+                }}
               >
-                <MenuItem value='gmt-12'>(GMT-12:00) International Date Line West</MenuItem>
-                <MenuItem value='gmt-11'>(GMT-11:00) Midway Island, Samoa</MenuItem>
-                <MenuItem value='gmt-10'>(GMT-10:00) Hawaii</MenuItem>
-                <MenuItem value='gmt-09'>(GMT-09:00) Alaska</MenuItem>
-                <MenuItem value='gmt-08'>(GMT-08:00) Pacific Time (US & Canada)</MenuItem>
-                <MenuItem value='gmt-08-baja'>(GMT-08:00) Tijuana, Baja California</MenuItem>
-                <MenuItem value='gmt-07'>(GMT-07:00) Chihuahua, La Paz, Mazatlan</MenuItem>
-                <MenuItem value='gmt-07-mt'>(GMT-07:00) Mountain Time (US & Canada)</MenuItem>
-                <MenuItem value='gmt-06'>(GMT-06:00) Central America</MenuItem>
-                <MenuItem value='gmt-06-ct'>(GMT-06:00) Central Time (US & Canada)</MenuItem>
-                <MenuItem value='gmt-06-mc'>(GMT-06:00) Guadalajara, Mexico City, Monterrey</MenuItem>
-                <MenuItem value='gmt-06-sk'>(GMT-06:00) Saskatchewan</MenuItem>
-                <MenuItem value='gmt-05'>(GMT-05:00) Bogota, Lima, Quito, Rio Branco</MenuItem>
-                <MenuItem value='gmt-05-et'>(GMT-05:00) Eastern Time (US & Canada)</MenuItem>
-                <MenuItem value='gmt-05-ind'>(GMT-05:00) Indiana (East)</MenuItem>
-                <MenuItem value='gmt-04'>(GMT-04:00) Atlantic Time (Canada)</MenuItem>
-                <MenuItem value='gmt-04-clp'>(GMT-04:00) Caracas, La Paz</MenuItem>
+                <MenuItem value="(GMT-12:00)">International Date Line West</MenuItem>
+                <MenuItem value="(GMT-11:00)">Midway Island, Samoa</MenuItem>
+                <MenuItem value="(GMT-10:00)">Hawaii</MenuItem>
+                <MenuItem value="(GMT-09:00)">Alaska</MenuItem>
+                <MenuItem value="(GMT-08:00)">Pacific Time (US & Canada)</MenuItem>
+                <MenuItem value="(GMT-08:00)">Tijuana, Baja California</MenuItem>
+                <MenuItem value="(GMT-07:00)">Chihuahua, La Paz, Mazatlan</MenuItem>
+                <MenuItem value="(GMT-07:00)">Mountain Time (US & Canada)</MenuItem>
+                <MenuItem value="(GMT-06:00)">Central America</MenuItem>
+                <MenuItem value="(GMT-06:00)">Central Time (US & Canada)</MenuItem>
+                <MenuItem value="(GMT-06:00)">Guadalajara, Mexico City, Monterrey</MenuItem>
+                <MenuItem value="(GMT-06:00)">Saskatchewan</MenuItem>
+                <MenuItem value="(GMT-05:00)">Bogota, Lima, Quito, Rio Branco</MenuItem>
+                <MenuItem value="(GMT-05:00)">Eastern Time (US & Canada)</MenuItem>
+                <MenuItem value="(GMT-05:00)">Indiana (East)</MenuItem>
+                <MenuItem value="(GMT-04:00)">Atlantic Time (Canada)</MenuItem>
+                <MenuItem value="(GMT-04:00)">Caracas, La Paz</MenuItem>
               </CustomTextField>
             </Grid>
             <Grid item xs={12} sm={6}>
               <CustomTextField
                 select
-                fullWidth
-                label='Currency'
+                label="Currency"
                 value={formData.currency}
-                onChange={e => handleFormChange('currency', e.target.value)}
+                onChange={(e) => handleFormChange('currency', e.target.value)}
               >
-                <MenuItem value='usd'>USD</MenuItem>
-                <MenuItem value='euro'>EUR</MenuItem>
-                <MenuItem value='pound'>Pound</MenuItem>
-                <MenuItem value='bitcoin'>Bitcoin</MenuItem>
+                <MenuItem value="USD">USD</MenuItem>
+                <MenuItem value="EUR">EUR</MenuItem>
+                <MenuItem value="Pound">Pound</MenuItem>
+                <MenuItem value="Bitcoin">Bitcoin</MenuItem>
               </CustomTextField>
             </Grid>
-            <Grid item xs={12} className='flex gap-4 flex-wrap'>
-              <Button variant='contained' type='submit'>
+            <Grid item xs={12}>
+              <Button type="submit" variant="contained" color="primary">
                 Save Changes
               </Button>
-              <Button variant='tonal' type='reset' color='secondary' onClick={() => setFormData(initialData)}>
+              <Button onClick={handleReset} variant="outlined" color="secondary">
                 Reset
               </Button>
             </Grid>

@@ -30,6 +30,22 @@ import { useSettings } from '@core/hooks/useSettings'
 // Core Theme Imports
 import defaultCoreTheme from '@core/theme'
 
+const defaultSettings = {
+  skin: 'default',
+  appBar: 'fixed',
+  navCollapsed: false,
+  layout: 'vertical',
+  lastLayout: 'vertical',
+  direction: 'ltr',
+  semiDark: false,
+  navbarType: 'floating',
+  footerType: 'static',
+  themeColor: 'primary',
+  contentWidth: 'full',
+  mode: 'light',
+  primaryColor: '#7367F0'
+}
+
 const ThemeProvider = props => {
   // Props
   const { children, direction, systemMode } = props
@@ -40,48 +56,40 @@ const ThemeProvider = props => {
 
   // Vars
   const isServer = typeof window === 'undefined'
-  let currentMode
-
-  if (isServer) {
-    currentMode = systemMode
-  } else {
-    if (settings.mode === 'system') {
-      currentMode = isDark ? 'dark' : 'light'
-    } else {
-      currentMode = settings.mode
-    }
-  }
+  const currentSettings = settings || defaultSettings
+  let currentMode = isServer ? systemMode : currentSettings.mode === 'system' ? (isDark ? 'dark' : 'light') : currentSettings.mode
 
   // Merge the primary color scheme override with the core theme
   const theme = useMemo(() => {
+    const primaryColor = currentSettings?.primaryColor || defaultSettings.primaryColor
+
     const newColorScheme = {
       colorSchemes: {
         light: {
           palette: {
             primary: {
-              main: settings.primaryColor,
-              light: lighten(settings.primaryColor, 0.2),
-              dark: darken(settings.primaryColor, 0.1)
+              main: primaryColor,
+              light: primaryColor ? lighten(primaryColor, 0.2) : lighten(defaultSettings.primaryColor, 0.2),
+              dark: primaryColor ? darken(primaryColor, 0.1) : darken(defaultSettings.primaryColor, 0.1)
             }
           }
         },
         dark: {
           palette: {
             primary: {
-              main: settings.primaryColor,
-              light: lighten(settings.primaryColor, 0.2),
-              dark: darken(settings.primaryColor, 0.1)
+              main: primaryColor,
+              light: primaryColor ? lighten(primaryColor, 0.2) : lighten(defaultSettings.primaryColor, 0.2),
+              dark: primaryColor ? darken(primaryColor, 0.1) : darken(defaultSettings.primaryColor, 0.1)
             }
           }
         }
       }
     }
 
-    const coreTheme = deepmerge(defaultCoreTheme(settings, currentMode, direction), newColorScheme)
+    const coreTheme = deepmerge(defaultCoreTheme(currentSettings, currentMode, direction), newColorScheme)
 
     return extendTheme(coreTheme)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.primaryColor, settings.skin, currentMode])
+  }, [currentSettings, currentMode, direction])
 
   return (
     <AppRouterCacheProvider
