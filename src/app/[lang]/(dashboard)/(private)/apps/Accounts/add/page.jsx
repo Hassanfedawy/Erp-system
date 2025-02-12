@@ -477,13 +477,26 @@ const AddAccountPage = () => {
           headers: { Token: API_TOKEN, 'Content-Type': 'application/json' },
           transformRequest: [(data) => JSON.stringify(data)]
         }
-      )
-      console.log("Main Form Response:", response.data)
-      const returnedAccountId = response.data.id
-      localStorage.setItem("AccountId", returnedAccountId)
-      setActiveTab(1)
+      );
+  
+      console.log("Main Form Response:", response.data);
+  
+      // Extract the 'id' from the ResultData string.
+      // Example ResultData: "{ MSG = Data saved successfully. , id = 19 }"
+      const resultData = response.data.ResultData;
+      const idMatch = resultData.match(/id\s*=\s*(\d+)/);
+  
+      if (idMatch && idMatch[1]) {
+        const returnedAccountId = idMatch[1];
+        localStorage.setItem("AccountId", returnedAccountId);
+        console.log("AccountId set in localStorage:", returnedAccountId);
+      } else {
+        console.error("Account id not found in ResultData");
+      }
+  
+      setActiveTab(1);
     } catch (error) {
-      console.error("Error sending DataTrans request:", error)
+      console.error("Error submitting data:", error);
     }
     reset(defaultValues)
   }
@@ -808,7 +821,7 @@ const AddAccountPage = () => {
                     {currencyOptions.length > 0 ? (
                       currencyOptions.map((option) => (
                         <MenuItem key={option.id} value={option.id}>
-                          {option.OMLA_NAME}
+                          {option.currency_name}
                         </MenuItem>
                       ))
                     ) : (
@@ -852,7 +865,7 @@ const AddAccountPage = () => {
                       <TableCell>Daen</TableCell>
                       <TableCell>Mden</TableCell>
                       <TableCell>Egmaly</TableCell>
-                      <TableCell>OMLA NAME</TableCell>
+                      <TableCell>Currency</TableCell>
                       <TableCell>Code</TableCell>
                     </TableRow>
                   </TableHead>
@@ -867,7 +880,7 @@ const AddAccountPage = () => {
                           <TableCell>{row.daen}</TableCell>
                           <TableCell>{row.mden}</TableCell>
                           <TableCell>{row.egmaly}</TableCell>
-                          <TableCell>{row.OMLA_NAME}</TableCell>
+                          <TableCell>{row.currency_name}</TableCell>
                           <TableCell>{row.code}</TableCell>
                         </TableRow>
                       ))
