@@ -110,7 +110,7 @@ const AddAccountPage = () => {
   } = useForm({ defaultValues })
 
   // State for the active tab (0: main form, 1: sub-forms)
-  const [activeTab, setActiveTab] = useState(1)
+  const [activeTab, setActiveTab] = useState(0)
 
   // States for dropdown options (fetched from APIs)
   const [accountTypeOptions, setAccountTypeOptions] = useState([])
