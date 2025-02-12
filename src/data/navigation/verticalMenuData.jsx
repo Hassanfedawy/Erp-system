@@ -79,6 +79,11 @@ const verticalMenuData = dictionary => [
     isSection: true,
     children: [
       {
+        label: dictionary['navigation'].accounts,
+        icon: 'tabler-users',
+        href: '/apps/Accounts'
+      },
+      {
         label: dictionary['navigation'].eCommerce,
         icon: 'tabler-shopping-cart',
         children: [
