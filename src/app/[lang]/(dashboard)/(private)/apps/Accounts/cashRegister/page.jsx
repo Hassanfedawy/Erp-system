@@ -274,7 +274,7 @@ const CashRegForm = () => {
   
     const encryptedParams = encryptData({
       state: "2",
-      Index: "9Gxa/++yB2r7leSJMWyxnA==",
+      Index: "9Gxa/++yB2qrhNM6zISaFg==",
       Params: params,
     });
   console.log(encryptedParams)
