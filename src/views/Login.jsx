@@ -201,7 +201,7 @@ const Login = ({ mode }) => {
         localStorage.removeItem('pendingSession')
         sessionStorage.removeItem('pendingSession')
   
-        localStorage.setItem('sessionId', response.data.SessionID);
+        localStorage.setItem('sessionID', response.data.SessionID);
         localStorage.setItem('settings', JSON.stringify(response.data.userSettings));
         const defaultSettings = {
           skin: 'default',
