@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import crypto from 'crypto';
+import toast, { Toaster } from 'react-hot-toast';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPencilAlt, faTrash } from '@fortawesome/free-solid-svg-icons';
 
@@ -55,6 +58,27 @@ const encryptData = (data) => {
   return encrypt(jsonString);
 };
 
+const initialFormData = {
+  id: '',
+  accountNo: '',
+  bankId: '',
+  date: null,
+  balance: '',
+  notes: '',
+  rate: '',
+  IBAN_NO: '',
+  SWIFT_CODE: '',
+  companyId: '',
+  currencyId: ''
+};
+
+const formatDate = (date) => {
+  if (!date) return '';
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear().toString().slice(-2);
+  return `${month < 10 ? '0' + month : month}/${year}`;
+};
+
 const BankAccountForm = () => {
   const [companies, setCompanies] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -62,20 +86,53 @@ const BankAccountForm = () => {
   const [tableData, setTableData] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [formData, setFormData] = useState({
-    id: '',
-    accountNo: '',
-    bankId: '',
-    date: '',
-    balance: '',
-    notes: '',
-    rate: '',
-    IBAN_NO: '',
-    SWIFT_CODE: '',
-    companyId: '',
-    currencyId: ''
-  });
+  const [formData, setFormData] = useState(initialFormData);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBankFilter, setSelectedBankFilter] = useState('');
+  const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState('');
+
+  const validateForm = () => {
+    if (!formData.accountNo.trim()) {
+      toast.error("Account number is required.");
+      return false;
+    }
+    if (!formData.bankId) {
+      toast.error("Bank is required.");
+      return false;
+    }
+    if (!formData.date) {
+      toast.error("Date is required.");
+      return false;
+    }
+    if (!formData.balance.trim()) {
+      toast.error("Opening balance is required.");
+      return false;
+    }
+    if (isNaN(parseFloat(formData.balance))) {
+      toast.error("Opening balance must be a number.");
+      return false;
+    }
+    if (!formData.currencyId) {
+      toast.error("Currency is required.");
+      return false;
+    }
+    if (!formData.rate.trim()) {
+      toast.error("Rate is required.");
+      return false;
+    }
+    if (isNaN(parseFloat(formData.rate))) {
+      toast.error("Rate must be a number.");
+      return false;
+    }
+    if (!formData.companyId) {
+      toast.error("Company is required.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     const fetchData = async (index, setState) => {
@@ -101,24 +158,16 @@ const BankAccountForm = () => {
             }
           }
         );
-        console.log(response.data);
         const decryptedData = decrypt(response.data.ResultData);
         const parsedData = JSON.parse(decryptedData);
-        console.log('Fetched Data:', parsedData);
-
         setState(parsedData);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
 
-    // Fetch companies
     fetchData('NrwmTknEaJYYX0RKar+pYZUOVVg5SqH4', setCompanies);
-
-    // Fetch currencies
     fetchData('nbP1CHGw6f/nir2q8luij0LaIU03mndvkDfMffBB5mg=', setCurrencies);
-
-    // Fetch banks
     fetchData('3L0TFx9ZMMq9RfPfdIlRGw==', setBanks);
   }, []);
 
@@ -152,8 +201,6 @@ const BankAccountForm = () => {
 
       const decryptedData = decrypt(response.data.ResultData);
       const parsedData = JSON.parse(decryptedData);
-      console.log('Fetched Table Data:', parsedData);
-
       setTableData(parsedData);
       setShowTable(true);
     } catch (error) {
@@ -163,18 +210,21 @@ const BankAccountForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     try {
       const sessionId = localStorage.getItem('sessionID');
       if (!sessionId) {
         console.error('Session ID is not set in local storage.');
         return;
       }
+      const formattedDate = formatDate(formData.date);
 
-      const state = selectedItem ? 1 : 0; // 1 for update, 0 for add
+      const stateVal = selectedItem ? 1 : 0;
       const encryptedParams = encryptData({
-        state: state,
+        state: stateVal,
         Index: 'lzxagCKk3hN8VYjyNEJgSw==',
-        Params: `${formData.id}#~${formData.accountNo}#~${formData.bankId}#~${formData.date}#~${formData.balance}#~${formData.notes}#~${formData.rate}#~${formData.IBAN_NO}#~${formData.SWIFT_CODE}#~${formData.companyId}#~${formData.currencyId}`
+        Params: `${formData.id}#~${formData.accountNo}#~${formData.bankId}#~${formattedDate}#~${formData.balance}#~${formData.notes}#~${formData.rate}#~${formData.IBAN_NO}#~${formData.SWIFT_CODE}#~${formData.companyId}#~${formData.currencyId}`
       });
 
       const response = await axios.post(
@@ -192,39 +242,48 @@ const BankAccountForm = () => {
         }
       );
 
-      console.log('DataTrans Response:', response.data);
-      alert('Data submitted successfully!');
+      toast.success("Data submitted successfully!");
+      setFormData(initialFormData);
       setShowUpdateForm(false);
       setSelectedItem(null);
-      handleViewTable(); // Refresh the table
+      handleViewTable();
     } catch (error) {
       console.error('Error submitting data:', error);
-      alert('Failed to submit data.');
+      toast.error("Failed to submit data.");
     }
   };
 
   const handleUpdate = (item) => {
+    let dateObj = null;
+    if (item.dte) {
+      const date = new Date(item.dte);
+      dateObj = new Date(date.getFullYear(), date.getMonth(), 1);
+    }
+
     setFormData({
       id: item.id,
       accountNo: item.num,
       bankId: item.bank_id,
-      date: item.dte,
+      date: dateObj,
       balance: item.balance,
       notes: item.nots,
       rate: item.ex_rate,
       IBAN_NO: item.IBAN_NO,
       SWIFT_CODE: item.SWIFT_CODE,
       companyId: item.company_id,
-      currencyId: item.curr_id
+      currencyId: item.Curr_id // Ensure this matches the ID in the currencies array
     });
+
     setSelectedItem(item);
     setShowUpdateForm(true);
   };
 
-  const handleDelete = async (item) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this item?');
-    if (!confirmDelete) return;
+  const handleDeleteClick = (item) => {
+    setItemToDelete(item);
+    setShowConfirmDelete(true);
+  };
 
+  const confirmDelete = async () => {
     try {
       const sessionId = localStorage.getItem('sessionID');
       if (!sessionId) {
@@ -232,7 +291,7 @@ const BankAccountForm = () => {
         return;
       }
 
-      const params = `${item.id}#~${item.num}#~${item.bank_id}#~${item.dte}#~${item.balance}#~${item.nots}#~${item.ex_rate}#~${item.IBAN_NO}#~${item.SWIFT_CODE}#~${item.company_id}#~${item.Curr_id}`;
+      const params = `${itemToDelete.id}#~${itemToDelete.num}#~${itemToDelete.bank_id}#~${itemToDelete.dte}#~${itemToDelete.balance}#~${itemToDelete.nots}#~${itemToDelete.ex_rate}#~${itemToDelete.IBAN_NO}#~${itemToDelete.SWIFT_CODE}#~${itemToDelete.company_id}#~${itemToDelete.Curr_id}`;
       const encryptedParams = encryptData({
         state: 2,
         Index: 'lzxagCKk3hN8VYjyNEJgSw==',
@@ -253,18 +312,38 @@ const BankAccountForm = () => {
           }
         }
       );
-
-      console.log('DataTrans Response:', response.data);
-      alert('Data deleted successfully!');
-      handleViewTable(); // Refresh the table
+      toast.success("Data deleted successfully!");
+      handleViewTable();
     } catch (error) {
       console.error('Error deleting data:', error);
-      alert('Failed to delete data.');
+      toast.error("Failed to delete data.");
+    } finally {
+      setShowConfirmDelete(false);
+      setItemToDelete(null);
     }
   };
 
+  const filteredTableData = tableData.filter(item => {
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch =
+      searchQuery === '' ||
+      (item.num && item.num.toLowerCase().includes(searchLower)) ||
+      (item.description && item.description.toLowerCase().includes(searchLower));
+    const matchesBank =
+      selectedBankFilter === '' ||
+      (item.description && item.description === selectedBankFilter);
+    const matchesCurrency =
+      selectedCurrencyFilter === '' ||
+      (item.curr_name && item.curr_name === selectedCurrencyFilter);
+    return matchesSearch && matchesBank && matchesCurrency;
+  }).map(row => ({
+    ...row,
+    balance: parseFloat(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    Column1: parseFloat(row.Column1).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }));
+
   return (
-    <div className="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md relative">
       <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">Basic Info</h2>
       {!showUpdateForm ? (
         <>
@@ -287,7 +366,7 @@ const BankAccountForm = () => {
                   value={formData.bankId}
                   onChange={(e) => setFormData({ ...formData, bankId: e.target.value })}
                 >
-                  <option>Select Bank</option>
+                  <option value="">Select Bank</option>
                   {banks.map((bank) => (
                     <option key={bank.id} value={bank.id}>
                       {bank.description}
@@ -299,12 +378,13 @@ const BankAccountForm = () => {
             <div className="flex flex-col md:flex-row justify-between mb-4">
               <div className="w-full md:w-1/2 pr-2 mb-4 md:mb-0">
                 <label className="block text-gray-700 text-sm font-bold mb-2">Date</label>
-                <input
-                  type="text"
+                <DatePicker
+                  selected={formData.date}
+                  onChange={(date) => setFormData({ ...formData, date })}
+                  dateFormat="MM/yy"
+                  showMonthYearPicker
+                  placeholderText="MM/YY"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="MM/YY"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 />
               </div>
               <div className="w-full md:w-1/2 pl-2">
@@ -326,7 +406,7 @@ const BankAccountForm = () => {
                   value={formData.currencyId}
                   onChange={(e) => setFormData({ ...formData, currencyId: e.target.value })}
                 >
-                  <option>Select Currency</option>
+                  <option value="">Select Currency</option>
                   {currencies.map((currency) => (
                     <option key={currency.id} value={currency.id}>
                       {currency.description}
@@ -373,7 +453,7 @@ const BankAccountForm = () => {
                   value={formData.companyId}
                   onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
                 >
-                  <option>Select Company</option>
+                  <option value="">Select Company</option>
                   {companies.map((company) => (
                     <option key={company.id} value={company.id}>
                       {company.description}
@@ -392,8 +472,16 @@ const BankAccountForm = () => {
               </div>
             </div>
             <div className="flex flex-col md:flex-row justify-end mt-6 space-y-4 md:space-y-0 md:space-x-4">
-              <button type="submit" className="px-6 py-2 bg-indigo-500 text-white rounded-lg">Submit</button>
-              <button type="button" className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg">Cancel</button>
+              <button type="submit" className="px-6 py-2 bg-indigo-500 text-white rounded-lg">
+                Submit
+              </button>
+              <button
+                type="button"
+                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg"
+                onClick={() => setFormData(initialFormData)}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 className="px-6 py-2 bg-green-500 text-white rounded-lg"
@@ -405,29 +493,68 @@ const BankAccountForm = () => {
           </form>
 
           {showTable && (
-            <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
-              <div className="bg-white p-6 rounded shadow-md w-full max-w-4xl mx-4">
+            <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-800 bg-opacity-50 p-4 overflow-auto">
+              <div className="bg-white p-6 rounded shadow-md w-full max-w-4xl">
                 <h3 className="text-lg font-semibold mb-4 text-center">Data Table</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-4 sm:space-y-0">
+                  <input
+                    type="text"
+                    placeholder="Search by account or bank name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 w-full sm:w-1/3"
+                  />
+                  <div className="flex space-x-4">
+                    <select
+                      value={selectedBankFilter}
+                      onChange={(e) => setSelectedBankFilter(e.target.value)}
+                      className="px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">All Banks</option>
+                      {banks.map((bank) => (
+                        <option key={bank.id} value={bank.description}>
+                          {bank.description}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedCurrencyFilter}
+                      onChange={(e) => setSelectedCurrencyFilter(e.target.value)}
+                      className="px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">All Currencies</option>
+                      {currencies.map((currency) => (
+                        <option key={currency.id} value={currency.description}>
+                          {currency.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full bg-white border border-gray-300">
                     <thead>
                       <tr>
-                        <th className="py-2 px-4 border-b">ID</th>
-                        <th className="py-2 px-4 border-b">Number</th>
-                        <th className="py-2 px-4 border-b">Description</th>
-                        <th className="py-2 px-4 border-b">Company</th>
+                        <th className="py-2 px-4 border-b">Account Number</th>
                         <th className="py-2 px-4 border-b">Currency</th>
+                        <th className="py-2 px-4 border-b">Bank Name</th>
+                        <th className="py-2 px-4 border-b">State</th>
+                        <th className="py-2 px-4 border-b">Date</th>
+                        <th className="py-2 px-4 border-b">Bank Opening Balance</th>
+                        <th className="py-2 px-4 border-b">Current Balance</th>
                         <th className="py-2 px-4 border-b">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tableData.map((row, index) => (
+                      {filteredTableData.map((row) => (
                         <tr key={row.id} className="border-b">
-                          <td className="py-2 px-4">{row.id}</td>
                           <td className="py-2 px-4">{row.num}</td>
-                          <td className="py-2 px-4">{row.description}</td>
-                          <td className="py-2 px-4">{row.comp_name}</td>
                           <td className="py-2 px-4">{row.curr_name}</td>
+                          <td className="py-2 px-4">{row.description}</td>
+                          <td className="py-2 px-4">{row.nots}</td>
+                          <td className="py-2 px-4">{new Date(row.dte).toLocaleDateString()}</td>
+                          <td className="py-2 px-4">{row.Column1}</td>
+                          <td className="py-2 px-4">{row.balance}</td>
                           <td className="py-2 px-4 flex space-x-2 justify-center">
                             <FontAwesomeIcon
                               icon={faPencilAlt}
@@ -437,7 +564,7 @@ const BankAccountForm = () => {
                             <FontAwesomeIcon
                               icon={faTrash}
                               className="text-red-500 cursor-pointer"
-                              onClick={() => handleDelete(row)}
+                              onClick={() => handleDeleteClick(row)}
                             />
                           </td>
                         </tr>
@@ -476,7 +603,7 @@ const BankAccountForm = () => {
                 value={formData.bankId}
                 onChange={(e) => setFormData({ ...formData, bankId: e.target.value })}
               >
-                <option>Select Bank</option>
+                <option value="">Select Bank</option>
                 {banks.map((bank) => (
                   <option key={bank.id} value={bank.id}>
                     {bank.description}
@@ -488,12 +615,13 @@ const BankAccountForm = () => {
           <div className="flex flex-col md:flex-row justify-between mb-4">
             <div className="w-full md:w-1/2 pr-2 mb-4 md:mb-0">
               <label className="block text-gray-700 text-sm font-bold mb-2">Date</label>
-              <input
-                type="text"
+              <DatePicker
+                selected={formData.date}
+                onChange={(date) => setFormData({ ...formData, date })}
+                dateFormat="MM/yy"
+                showMonthYearPicker
+                placeholderText="MM/YY"
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
-                placeholder="MM/YY"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               />
             </div>
             <div className="w-full md:w-1/2 pl-2">
@@ -515,7 +643,7 @@ const BankAccountForm = () => {
                 value={formData.currencyId}
                 onChange={(e) => setFormData({ ...formData, currencyId: e.target.value })}
               >
-                <option>Select Currency</option>
+                <option value="">Select Currency</option>
                 {currencies.map((currency) => (
                   <option key={currency.id} value={currency.id}>
                     {currency.description}
@@ -562,7 +690,7 @@ const BankAccountForm = () => {
                 value={formData.companyId}
                 onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
               >
-                <option>Select Company</option>
+                <option value="">Select Company</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.description}
@@ -581,17 +709,50 @@ const BankAccountForm = () => {
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-end mt-6 space-y-4 md:space-y-0 md:space-x-4">
-            <button type="submit" className="px-6 py-2 bg-indigo-500 text-white rounded-lg">Update</button>
+            <button type="submit" className="px-6 py-2 bg-indigo-500 text-white rounded-lg">
+              Update
+            </button>
             <button
               type="button"
               className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg"
-              onClick={() => setShowUpdateForm(false)}
+              onClick={() => {
+                setShowUpdateForm(false);
+                setFormData(initialFormData);
+              }}
             >
               Cancel
             </button>
           </div>
         </form>
       )}
+
+      {showConfirmDelete && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
+            <p>Are you sure you want to delete this item?</p>
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={confirmDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded w-full sm:w-auto mr-2"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmDelete(false);
+                  setItemToDelete(null);
+                }}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded w-full sm:w-auto"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toaster position="bottom-right" />
     </div>
   );
 };

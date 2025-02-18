@@ -4,6 +4,9 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import toast, { Toaster } from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 const key = process.env.NEXT_PUBLIC_AES_KEY;
 const iv = process.env.NEXT_PUBLIC_AES_IV;
@@ -57,24 +60,28 @@ const encryptData = (data) => {
 
 const CashRegForm = () => {
   const [accountTypes, setAccountTypes] = useState([]);
-  const [currencies, setCurrencies] = useState([]); // State for currency options
+  const [currencies, setCurrencies] = useState([]);
   const [formData, setFormData] = useState({
-    id: '',
+    id: 0,
     number: '',
     name: '',
     openingCredit: '',
     openingDebit: '',
-    date: '',
+    date: new Date(),
     rate: '',
     currency: 0,
     accountType: 0,
   });
   const [tableData, setTableData] = useState([]);
+  const [filteredTableData, setFilteredTableData] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [selectedAccountType, setSelectedAccountType] = useState('Cash Reg');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch account types
   useEffect(() => {
     const fetchAccountTypes = async () => {
       const encryptedParams = encryptData({
@@ -99,9 +106,6 @@ const CashRegForm = () => {
         );
         const decryptedResponse = decrypt(response.data.ResultData);
         const parsedResponse = JSON.parse(decryptedResponse);
-        console.log('Account Types API Response:', parsedResponse);
-
-        // Assuming the response contains an array of account types
         setAccountTypes(parsedResponse || []);
       } catch (error) {
         console.error('Error fetching account types:', error);
@@ -111,10 +115,8 @@ const CashRegForm = () => {
     fetchAccountTypes();
   }, []);
 
-  // Fetch currencies to populate the currency dropdown
   useEffect(() => {
     const fetchCurrencies = async () => {
-      // Preparing the encrypted payload as specified
       const encryptedParams = encryptData({
         Index: "nbP1CHGw6f/nir2q8luij0LaIU03mndvkDfMffBB5mg=",
         Params: ""
@@ -135,12 +137,8 @@ const CashRegForm = () => {
             }
           }
         );
-        console.log('Response:', response.data);
         const decryptedResponse = decrypt(response.data.ResultData);
         const parsedResponse = JSON.parse(decryptedResponse);
-        console.log('Currency API Response:', parsedResponse);
-
-        // Assuming the response returns an array of currencies
         setCurrencies(parsedResponse || []);
       } catch (error) {
         console.error('Error fetching currencies:', error);
@@ -156,12 +154,54 @@ const CashRegForm = () => {
       ...formData,
       [name]: value,
     });
+
+    if (name === 'accountType') {
+      const selectedType = accountTypes.find(type => type.id === parseInt(value));
+      setSelectedAccountType(selectedType ? selectedType.acc_name : 'Cash Reg');
+    }
+  };
+
+  const handleDateChange = (date) => {
+    setFormData({
+      ...formData,
+      date: date,
+    });
+  };
+
+  const validateForm = (data = formData) => {
+    const { rate, openingCredit, openingDebit } = data;
+    const isNumber = (value) => /^\d+(\.\d+)?$/.test(value);
+
+    if (!isNumber(rate) || !isNumber(openingCredit) || !isNumber(openingDebit)) {
+      toast.error('Rate, Opening Credit, and Opening Debit must be numbers.');
+      return false;
+    }
+    return true;
+  };
+
+  const resetForm = () => {
+    setFormData({
+      id: 0,
+      number: '',
+      name: '',
+      openingCredit: '',
+      openingDebit: '',
+      date: new Date(),
+      rate: '',
+      currency: 0,
+      accountType: 0,
+    });
+    setSelectedAccountType('Cash Reg');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
+
     const sessionId = localStorage.getItem('sessionID');
-    const params = `${formData.id}#~${formData.number}#~${formData.name}#~${formData.openingCredit}#~${formData.openingDebit}#~${formData.date}#~${formData.rate}#~${formData.currency}#~${formData.accountType}`;
+    const params = `${formData.id}#~${formData.number}#~${formData.name}#~${formData.openingCredit}#~${formData.openingDebit}#~${formData.date.toISOString().split('T')[0]}#~${formData.rate}#~${formData.currency}#~${formData.accountType}`;
 
     const encryptedParams = encryptData({
       state: "0",
@@ -184,9 +224,11 @@ const CashRegForm = () => {
           }
         }
       );
+      toast.success('Data submitted successfully!');
+      resetForm();
       console.log('Submit API Response:', response.data);
-      // Handle success or error based on the response
     } catch (error) {
+      toast.error('Error submitting form.');
       console.error('Error submitting form:', error);
     }
   };
@@ -214,33 +256,45 @@ const CashRegForm = () => {
       );
       const decryptedResponse = decrypt(response.data.ResultData);
       const parsedResponse = JSON.parse(decryptedResponse);
-      console.log('View Tables API Response:', parsedResponse);
       setTableData(parsedResponse);
+      setFilteredTableData(parsedResponse);
       setShowPopup(true);
     } catch (error) {
+      toast.error('Error fetching tables.');
       console.error('Error fetching tables:', error);
     }
   };
 
   const handleUpdate = (item) => {
     setEditItem({
-      ...item,
-      accountType: item.class // Assuming 'class' is the account type ID
+      id: item.id,
+      num: item.num,
+      name: item.name,
+      openingCredit: item.daen,
+      openingDebit: item.mden,
+      date: new Date(item.s_date),
+      rate: item.ex_rate,
+      amla: item.omla_id,
+      accountType: item.typ_class,
     });
     setShowEditPopup(true);
   };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm(editItem)) {
+      return;
+    }
+
     const sessionId = localStorage.getItem('sessionID');
-    const params = `${editItem.id}#~${editItem.num}#~${editItem.name}#~${editItem.openingCredit}#~${editItem.openingDebit}#~${editItem.date}#~${editItem.rate}#~${editItem.amla}#~${editItem.accountType}`;
-  
+    const params = `${editItem.id}#~${editItem.num}#~${editItem.name}#~${editItem.openingCredit}#~${editItem.openingDebit}#~${editItem.date.toISOString().split('T')[0]}#~${editItem.rate}#~${editItem.amla}#~${editItem.accountType}`;
+
     const encryptedParams = encryptData({
       state: "1",
       Index: "9Gxa/++yB2qrhNM6zISaFg==",
       Params: params,
     });
-  
+
     try {
       const response = await axios.post(
         'https://erpapi.tocan.com.ly/api/Home/DataTrans',
@@ -256,28 +310,32 @@ const CashRegForm = () => {
           }
         }
       );
-      console.log('Update API Response:', response.data);
+      toast.success('Data updated successfully!');
       setShowEditPopup(false);
       setShowPopup(false);
-      // Handle success or error based on the response
+      resetForm();
+      console.log('Update API Response:', response.data);
     } catch (error) {
+      toast.error('Error updating item.');
       console.error('Error updating item:', error);
     }
   };
-  
 
-  const handleDelete = async (item) => {
+  const handleDelete = (item) => {
+    setItemToDelete(item);
+    setShowConfirmDelete(true);
+  };
+
+  const confirmDelete = async () => {
     const sessionId = localStorage.getItem('sessionID');
-    const params = `${item.id}#~${item.num}#~${item.name}#~${item.daen}#~${item.mden}#~${item.s_date}#~${item.ex_rate}#~${item.omla_id}#~${item.typ_class}`;
-  
-    console.log('Delete Params:', params); // Log the params string
-  
+    const params = `${itemToDelete.id}#~${itemToDelete.num}#~${itemToDelete.name}#~${itemToDelete.daen}#~${itemToDelete.mden}#~${itemToDelete.s_date}#~${itemToDelete.ex_rate}#~${itemToDelete.omla_id}#~${itemToDelete.typ_class}`;
+
     const encryptedParams = encryptData({
       state: "2",
       Index: "9Gxa/++yB2qrhNM6zISaFg==",
       Params: params,
     });
-  console.log(encryptedParams)
+
     try {
       const response = await axios.post(
         'https://erpapi.tocan.com.ly/api/Home/DataTrans',
@@ -293,27 +351,46 @@ const CashRegForm = () => {
           }
         }
       );
+      toast.success('Item deleted successfully!');
+      setTableData(tableData.filter(data => data.num !== itemToDelete.num));
+      setFilteredTableData(filteredTableData.filter(data => data.num !== itemToDelete.num));
+      setShowConfirmDelete(false);
+      setShowPopup(false);
       console.log('Delete API Response:', response.data);
-      // Handle success or error based on the response
     } catch (error) {
+      toast.error('Error deleting item.');
       console.error('Error deleting item:', error);
     }
   };
-  
-  
 
   const closePopup = () => {
     setShowPopup(false);
     setShowEditPopup(false);
     setEditItem(null);
+    setShowConfirmDelete(false);
+  };
+
+  const formatNumber = (value) => {
+    return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleSearch = (e) => {
+    const query = e.target.value.toLowerCase();
+    setSearchQuery(query);
+    setFilteredTableData(tableData.filter(item =>
+      item.name.toLowerCase().includes(query) ||
+      item.num.toString().includes(query)
+    ));
   };
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md sm:max-w-lg md:max-w-xl lg:max-w-2xl">
+      {/* React Hot Toast container with bottom-right position */}
+      <Toaster position="bottom-right" />
+
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <div className="flex items-center mb-4 sm:mb-0">
-          <img src="https://via.placeholder.com/30" alt="Logo" className="w-8 h-8 mr-2" />
-          <span className="text-lg font-semibold">Cash Reg</span>
+          <span className="text-lg font-semibold">{selectedAccountType}</span>
         </div>
         <select
           name="accountType"
@@ -334,14 +411,6 @@ const CashRegForm = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               type="text"
-              name="id"
-              value={formData.id}
-              onChange={handleChange}
-              placeholder="ID"
-              className="p-2 border border-gray-300 rounded w-full"
-            />
-            <input
-              type="text"
               name="number"
               value={formData.number}
               onChange={handleChange}
@@ -356,13 +425,12 @@ const CashRegForm = () => {
               placeholder="Name"
               className="p-2 border border-gray-300 rounded w-full"
             />
-            <input
-              type="text"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-              placeholder="MM/YY"
+            <DatePicker
+              selected={formData.date}
+              onChange={handleDateChange}
               className="p-2 border border-gray-300 rounded w-full"
+              dateFormat="MM/yyyy"
+              showMonthYearPicker
             />
           </div>
         </div>
@@ -428,11 +496,17 @@ const CashRegForm = () => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl sm:max-w-lg md:max-w-xl lg:max-w-2xl">
             <h2 className="text-xl font-semibold mb-4">Table Data</h2>
+            <input
+              type="text"
+              placeholder="Search by name or number..."
+              value={searchQuery}
+              onChange={handleSearch}
+              className="p-2 border border-gray-300 rounded w-full mb-4"
+            />
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white border border-gray-300">
                 <thead>
                   <tr>
-                    <th className="py-2 px-4 border-b">ID</th>
                     <th className="py-2 px-4 border-b">Number</th>
                     <th className="py-2 px-4 border-b">Name</th>
                     <th className="py-2 px-4 border-b">Opening Credit</th>
@@ -445,15 +519,14 @@ const CashRegForm = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-2 px-4 border-b">{item.id}</td>
+                  {filteredTableData.map((item) => (
+                    <tr key={item.num}>
                       <td className="py-2 px-4 border-b">{item.num}</td>
                       <td className="py-2 px-4 border-b">{item.name}</td>
-                      <td className="py-2 px-4 border-b">{item.daen}</td>
-                      <td className="py-2 px-4 border-b">{item.mden}</td>
+                      <td className="py-2 px-4 border-b">{formatNumber(item.daen)}</td>
+                      <td className="py-2 px-4 border-b">{formatNumber(item.mden)}</td>
                       <td className="py-2 px-4 border-b">{item.s_date}</td>
-                      <td className="py-2 px-4 border-b">{item.ex_rate}</td>
+                      <td className="py-2 px-4 border-b">{formatNumber(item.ex_rate)}</td>
                       <td className="py-2 px-4 border-b">{item.omla_id}</td>
                       <td className="py-2 px-4 border-b">{item.typ_class}</td>
                       <td className="py-2 px-4 border-b flex justify-center space-x-2">
@@ -489,14 +562,6 @@ const CashRegForm = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input
                     type="text"
-                    name="id"
-                    value={editItem.id}
-                    onChange={(e) => setEditItem({ ...editItem, id: e.target.value })}
-                    placeholder="ID"
-                    className="p-2 border border-gray-300 rounded w-full"
-                  />
-                  <input
-                    type="text"
                     name="number"
                     value={editItem.num}
                     onChange={(e) => setEditItem({ ...editItem, num: e.target.value })}
@@ -511,13 +576,12 @@ const CashRegForm = () => {
                     placeholder="Name"
                     className="p-2 border border-gray-300 rounded w-full"
                   />
-                  <input
-                    type="text"
-                    name="date"
-                    value={editItem.date}
-                    onChange={(e) => setEditItem({ ...editItem, date: e.target.value })}
-                    placeholder="MM/YY"
+                  <DatePicker
+                    selected={editItem.date}
+                    onChange={(date) => setEditItem({ ...editItem, date: date })}
                     className="p-2 border border-gray-300 rounded w-full"
+                    dateFormat="MM/yyyy"
+                    showMonthYearPicker
                   />
                 </div>
               </div>
@@ -590,6 +654,26 @@ const CashRegForm = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showConfirmDelete && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
+            <p>Are you sure you want to delete this item?</p>
+            <div className="flex justify-between mt-6">
+              <button onClick={confirmDelete} className="bg-red-500 text-white px-4 py-2 rounded w-full sm:w-auto">
+                Delete
+              </button>
+              <button
+                onClick={() => setShowConfirmDelete(false)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded w-full sm:w-auto"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

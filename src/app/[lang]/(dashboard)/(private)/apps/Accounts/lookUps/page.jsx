@@ -1,13 +1,10 @@
-//Remaining icons that will be sent through the backend.
-//Responsivness
-
-
 "use client";
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import crypto from 'crypto';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPencilAlt, faTrash } from '@fortawesome/free-solid-svg-icons';
+import toast, { Toaster } from 'react-hot-toast';
 
 const key = process.env.NEXT_PUBLIC_AES_KEY;
 const iv = process.env.NEXT_PUBLIC_AES_IV;
@@ -68,6 +65,9 @@ const LookupCategory = () => {
   const [selectedLindex, setSelectedLindex] = useState(null);
   const [isUpdate, setIsUpdate] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [selectedCategoryName, setSelectedCategoryName] = useState(''); // New state for selected category name
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,13 +101,14 @@ const LookupCategory = () => {
         setCategories(categoriesArray);
       } catch (error) {
         console.error('Error fetching data:', error);
+        toast.error('Failed to fetch data.');
       }
     };
 
     fetchData();
   }, []);
 
-  const handleCategoryClick = async (lindex) => {
+  const handleCategoryClick = async (lindex, categoryName) => {
     try {
       const sessionId = localStorage.getItem('sessionID');
       if (!sessionId) {
@@ -136,8 +137,10 @@ const LookupCategory = () => {
       console.log('Parsed Data on Click:', parsedData);
       setSelectedData(parsedData);
       setSelectedLindex(lindex); // Store the selected Lindex
+      setSelectedCategoryName(categoryName); // Update the selected category name
     } catch (error) {
       console.error('Error fetching data on click:', error);
+      toast.error('Failed to fetch data on click.');
     }
   };
 
@@ -148,18 +151,31 @@ const LookupCategory = () => {
 
   const handlePopupSubmit = async (e) => {
     e.preventDefault();
-    await sendDataTransRequest(isUpdate ? 1 : 0);
-    setShowPopup(false);
-    setIsUpdate(false);
-    setSelectedItem(null);
+    try {
+      await sendDataTransRequest(isUpdate ? 1 : 0);
+      toast.success(isUpdate ? 'Update successful!' : 'Data added successfully!');
+      setShowPopup(false);
+      setIsUpdate(false);
+      setSelectedItem(null);
+    } catch (error) {
+      toast.error(isUpdate ? 'Update failed!' : 'Failed to add data!');
+    }
   };
 
-  const handleDelete = async (item) => {
-    console.log('Delete initiated for item:', item);
-    await sendDataTransRequest(2, item.id, item.number, item.description);
-    console.log('Delete request sent for item:', item);
-    setSelectedData(selectedData.filter(data => data.id !== item.id));
-    console.log('Updated selectedData after delete:', selectedData);
+  const handleDelete = (item) => {
+    setItemToDelete(item);
+    setShowConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await sendDataTransRequest(2, itemToDelete.id, itemToDelete.number, itemToDelete.description);
+      toast.success('Delete successful!');
+      setSelectedData(selectedData.filter(data => data.id !== itemToDelete.id));
+      setShowConfirm(false);
+    } catch (error) {
+      toast.error('Delete failed!');
+    }
   };
 
   const handleUpdate = (item) => {
@@ -207,11 +223,14 @@ const LookupCategory = () => {
       console.log('DataTrans Response:', response.data);
     } catch (error) {
       console.error('Error sending DataTrans request:', error);
+      throw error;
     }
   };
 
   return (
     <div className="flex flex-col md:flex-row">
+      {/* React Hot Toast container with bottom-right position */}
+      <Toaster position="bottom-right" />
       <div className="w-full md:w-1/4 bg-gray-200 p-4">
         <h2 className="text-xl font-bold mb-4">Lookup Category</h2>
         <ul>
@@ -220,9 +239,9 @@ const LookupCategory = () => {
               <a
                 href="#"
                 className="flex items-center cursor-pointer"
-                onClick={() => handleCategoryClick(category.Lindex)}
+                onClick={() => handleCategoryClick(category.Lindex, category.E_Lookup)}
               >
-               {category.icon && <i className={category.icon} />}
+                {category.Icon && <img src={`data:image/png;base64,${category.Icon}`} alt={category.E_Lookup} className="w-6 h-6 mr-2" />}
                 {category.E_Lookup}
               </a>
             </li>
@@ -232,29 +251,40 @@ const LookupCategory = () => {
       <div className="w-full md:w-3/4 p-4">
         {selectedData ? (
           <div>
-            <h3 className="text-lg font-semibold mb-2">Selected Data:</h3>
-            <ul>
-              {selectedData.map((item, index) => (
-                <li key={index} className="mb-1 flex items-center">
-                  <span className="font-bold flex-grow">{item.number}:</span>
-                  <span className="flex-grow">{item.description}</span>
-                  <div className="flex space-x-2">
-                    {/* Update Icon */}
-                    <FontAwesomeIcon
-                      icon={faPencilAlt}
-                      className="text-blue-500 cursor-pointer"
-                      onClick={() => handleUpdate(item)}
-                    />
-                    {/* Delete Icon */}
-                    <FontAwesomeIcon
-                      icon={faTrash}
-                      className="text-red-500 cursor-pointer"
-                      onClick={() => handleDelete(item)}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <h3 className="text-lg font-semibold mb-2">{selectedCategoryName}</h3> {/* Use the selected category name */}
+            <table className="min-w-full bg-white border border-gray-300">
+              <thead>
+                <tr>
+                  <th className="py-2 px-4 border-b">Number</th>
+                  <th className="py-2 px-4 border-b">Description</th>
+                  <th className="py-2 px-4 border-b">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedData.map((item, index) => (
+                  <tr key={index}>
+                    <td className="py-2 px-4 border-b text-center">{item.number}</td>
+                    <td className="py-2 px-4 border-b text-center">{item.description}</td>
+                    <td className="py-2 px-4 border-b text-center">
+                      <div className="flex space-x-2 justify-center">
+                        {/* Update Icon */}
+                        <FontAwesomeIcon
+                          icon={faPencilAlt}
+                          className="text-blue-500 cursor-pointer"
+                          onClick={() => handleUpdate(item)}
+                        />
+                        {/* Delete Icon */}
+                        <FontAwesomeIcon
+                          icon={faTrash}
+                          className="text-red-500 cursor-pointer"
+                          onClick={() => handleDelete(item)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             <button
               className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               onClick={() => {
@@ -297,6 +327,22 @@ const LookupCategory = () => {
                       </button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+            {showConfirm && (
+              <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
+                <div className="bg-white p-6 rounded shadow-md w-80">
+                  <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
+                  <p>Are you sure you want to delete this item?</p>
+                  <div className="flex items-center justify-between mt-4">
+                    <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" onClick={confirmDelete}>
+                      Delete
+                    </button>
+                    <button className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" onClick={() => setShowConfirm(false)}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
